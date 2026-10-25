@@ -52,6 +52,23 @@ it('throws an exception for a permission that the record does not offer', functi
     note($this->owner)->syncShares([$this->ada->id => SharePermission::Edit], $this->owner);
 })->throws(InvalidArgumentException::class, 'cannot share a');
 
+it('keeps an existing share at a permission that the record does not offer now', function () {
+    $note = note($this->owner);
+    $note->shares()->create(['shared_with_id' => $this->ada->id, 'permission' => SharePermission::Edit]);
+
+    $note->shareWith($this->alan, SharePermission::View, $this->owner);
+
+    expect($note->permissionFor($this->ada))->toBe(SharePermission::Edit)
+        ->and($note->permissionFor($this->alan))->toBe(SharePermission::View);
+});
+
+it('does not change an existing share to a permission that the record does not offer', function () {
+    $note = note($this->owner);
+    $note->shares()->create(['shared_with_id' => $this->ada->id, 'permission' => SharePermission::View]);
+
+    $note->shareWith($this->ada, SharePermission::Edit, $this->owner);
+})->throws(InvalidArgumentException::class, 'cannot share a');
+
 it('dispatches an event for each change', function () {
     Event::fake([RecordShared::class, SharePermissionChanged::class, RecordUnshared::class]);
 

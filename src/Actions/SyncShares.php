@@ -43,7 +43,9 @@ class SyncShares
      */
     public function execute(Model&Shareable $record, Collection $people, ?Model $performedBy = null): Collection
     {
-        $people = $this->permissions($record, $people);
+        $people = $people->map(
+            fn (SharePermission|string $permission): SharePermission => $permission instanceof SharePermission ? $permission : SharePermission::from($permission)
+        );
 
         $users = Collaboration::userQueryWithTrashed()
             ->whereKey($people->keys()->all())
@@ -58,6 +60,10 @@ class SyncShares
             ->transaction(function () use ($record, $people, $users, $performedBy): Collection {
                 $existing = $record->shares()->get()->keyBy('shared_with_id')->toBase();
                 $previous = $existing->map(fn (Share $share): SharePermission => $share->permission);
+
+                $this->ensureOffered($record, $people->reject(
+                    fn (SharePermission $permission, int|string $key): bool => $previous->get($key) === $permission
+                ));
 
                 $added = $people->diffKeys($existing);
                 $removed = $previous->diffKeys($people);
@@ -106,16 +112,18 @@ class SyncShares
     }
 
     /**
-     * @param  Collection<int|string, SharePermission|string>  $people
-     * @return Collection<int|string, SharePermission>
+     * This method causes an exception if the record does not offer one of
+     * the permissions. The method examines only the new and the changed
+     * permissions. If a record stops to offer a permission, the existing
+     * shares at that permission stay valid.
+     *
+     * @param  Collection<int|string, SharePermission>  $people
      */
-    protected function permissions(Model&Shareable $record, Collection $people): Collection
+    protected function ensureOffered(Model&Shareable $record, Collection $people): void
     {
         $offered = $record->sharePermissions();
 
-        return $people->map(function (SharePermission|string $permission) use ($record, $offered): SharePermission {
-            $permission = $permission instanceof SharePermission ? $permission : SharePermission::from($permission);
-
+        foreach ($people as $permission) {
             if (! in_array($permission, $offered, true)) {
                 throw new InvalidArgumentException(sprintf(
                     'You cannot share a %s with the "%s" permission.',
@@ -123,8 +131,6 @@ class SyncShares
                     $permission->value,
                 ));
             }
-
-            return $permission;
-        });
+        }
     }
 }
