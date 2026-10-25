@@ -207,6 +207,8 @@ abort_if($record === null, 404);
 $this->authorize('share', $record);
 ```
 
+The method finds the record by its route key. To use a different column, give the field, for example `findShareable($type, $id, 'id')`.
+
 The type can be a morph alias or a class name. In a Livewire component, add `#[Locked]` to the type and the key. Then the browser cannot change the record after you authorize it.
 
 ### Find people

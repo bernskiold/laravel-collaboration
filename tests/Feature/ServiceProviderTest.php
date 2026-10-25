@@ -26,6 +26,13 @@ it('finds a shareable record from a morph alias or a class name', function () {
         ->and(Collaboration::findShareable(Post::class, (string) $post->id)->is($post))->toBeTrue();
 });
 
+it('finds a shareable record by a different field', function () {
+    $post = post(name: 'Roadmap');
+
+    expect(Collaboration::findShareable('post', 'Roadmap', 'name')->is($post))->toBeTrue()
+        ->and(Collaboration::findShareable('post', 'Unknown', 'name'))->toBeNull();
+});
+
 it('finds nothing for a type that is not shareable, or a missing record', function (string $type, string $key) {
     post();
 

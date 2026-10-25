@@ -83,10 +83,13 @@ class Collaboration
      * null if the type is not a shareable model. It also returns null if
      * the record does not exist.
      *
+     * The method finds the record by its route key. To use a different
+     * column, for example the primary key, give the field.
+     *
      * Use this method in a component or a tool that gets the record from the
      * browser or from an API call. Then authorize the user for the record.
      */
-    public static function findShareable(string $type, int|string $key): (Model&Shareable)|null
+    public static function findShareable(string $type, int|string $key, ?string $field = null): (Model&Shareable)|null
     {
         $class = Relation::getMorphedModel($type) ?? $type;
 
@@ -94,7 +97,7 @@ class Collaboration
             return null;
         }
 
-        $record = (new $class)->resolveRouteBinding($key);
+        $record = (new $class)->resolveRouteBinding($key, $field);
 
         return $record instanceof Shareable ? $record : null;
     }
