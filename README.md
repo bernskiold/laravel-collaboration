@@ -9,13 +9,13 @@ The owner of a record can share it with other users. Each user gets a permission
 The package has no user interface. It has no views and no components. It gives the data, the rules, the events, the notification and the activity log. Your application has the interface.
 
 ```php
-$portfolio->shareWith($ada, SharePermission::Edit);
+$document->shareWith($ada, SharePermission::Edit);
 
-$portfolio->isSharedWith($ada);                          // true
-$portfolio->isSharedWith($ada, SharePermission::Edit);   // true
-Portfolio::query()->sharedWith($ada)->get();
+$document->isSharedWith($ada);                          // true
+$document->isSharedWith($ada, SharePermission::Edit);   // true
+Document::query()->sharedWith($ada)->get();
 
-$portfolio->stopSharingWith($ada);
+$document->stopSharingWith($ada);
 ```
 
 ## What the package does
@@ -65,7 +65,7 @@ Implement `Shareable`. Use `CanBeShared`. Then give the column that keeps the ke
 use Bernskiold\LaravelCollaboration\Concerns\CanBeShared;
 use Bernskiold\LaravelCollaboration\Contracts\Shareable;
 
-class Portfolio extends Model implements Shareable
+class Document extends Model implements Shareable
 {
     use CanBeShared;
 
@@ -103,21 +103,21 @@ public function sharePermissions(): array
 The package does not give access. Your policy reads the shares:
 
 ```php
-class PortfolioPolicy
+class DocumentPolicy
 {
-    public function view(User $user, Portfolio $portfolio): bool
+    public function view(User $user, Document $document): bool
     {
-        return $portfolio->isOwnedBy($user) || $portfolio->isSharedWith($user);
+        return $document->isOwnedBy($user) || $document->isSharedWith($user);
     }
 
-    public function update(User $user, Portfolio $portfolio): bool
+    public function update(User $user, Document $document): bool
     {
-        return $portfolio->isOwnedBy($user) || $portfolio->isSharedWith($user, SharePermission::Edit);
+        return $document->isOwnedBy($user) || $document->isSharedWith($user, SharePermission::Edit);
     }
 
-    public function share(User $user, Portfolio $portfolio): bool
+    public function share(User $user, Document $document): bool
     {
-        return $portfolio->isOwnedBy($user);
+        return $document->isOwnedBy($user);
     }
 }
 ```
@@ -127,10 +127,10 @@ If you eager load the shares, `isSharedWith()` and `permissionFor()` use the loa
 ## Find records
 
 ```php
-Portfolio::query()->sharedWith($user)->get();                          // shared with the user
-Portfolio::query()->sharedWith($user, SharePermission::Edit)->get();   // shared at edit
-Portfolio::query()->ownedBy($user)->get();                             // the user is the owner
-Portfolio::query()->ownedByOrSharedWith($user)->get();                 // the user is the owner, or it is shared with the user
+Document::query()->sharedWith($user)->get();                          // shared with the user
+Document::query()->sharedWith($user, SharePermission::Edit)->get();   // shared at edit
+Document::query()->ownedBy($user)->get();                             // the user is the owner
+Document::query()->ownedByOrSharedWith($user)->get();                 // the user is the owner, or it is shared with the user
 ```
 
 Each scope accepts a model, a key or `null`. With `null`, the scope finds no records. You can give `auth()->user()` also when nobody is signed in.
@@ -186,7 +186,7 @@ To send a different notification for one type of record, override the method. Re
 ```php
 public function shareNotification(Model $sharedWith, ?Model $sharedBy, SharePermission $permission): ?Notification
 {
-    return new PortfolioShared($this, $sharedBy);
+    return new DocumentShared($this, $sharedBy);
 }
 ```
 
@@ -297,7 +297,7 @@ foreach ($record->sharePermissions() as $permission) {
 `Share::factory()` makes shares for your tests. The factory writes the share directly. It does not record activity, dispatch events or send notifications:
 
 ```php
-Share::factory()->on($portfolio)->sharedWith($user)->edit()->create();
+Share::factory()->on($document)->sharedWith($user)->edit()->create();
 ```
 
 The states are `on($record)`, `sharedWith($user)`, `sharedBy($user)`, `view()`, `edit()` and `permission($permission)`. Without `sharedWith()`, the factory makes a user with the factory of your user model.

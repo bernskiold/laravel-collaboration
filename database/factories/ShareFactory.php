@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * This factory makes shares for tests.
  *
- *     Share::factory()->on($portfolio)->sharedWith($user)->edit()->create();
+ *     Share::factory()->on($document)->sharedWith($user)->edit()->create();
  *
  * The factory writes the share directly. It does not record activity, dispatch
  * events or send notifications. To test those, use shareWith() or SyncShares.
