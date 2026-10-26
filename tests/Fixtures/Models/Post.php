@@ -7,7 +7,8 @@ use Bernskiold\LaravelCollaboration\Contracts\Shareable;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A shareable record. It offers the two permissions.
+ * A shareable record. It offers the two permissions. Its owner is in the
+ * owner_id column.
  */
 class Post extends Model implements Shareable
 {
@@ -15,9 +16,9 @@ class Post extends Model implements Shareable
 
     protected $guarded = [];
 
-    public function isOwnedBy(Model $user): bool
+    public function shareOwnerColumn(): ?string
     {
-        return $this->owner_id !== null && $this->owner_id === $user->getKey();
+        return 'owner_id';
     }
 
     public function shareableUrl(): ?string

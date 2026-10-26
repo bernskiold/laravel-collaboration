@@ -1,5 +1,6 @@
 <?php
 
+use Bernskiold\LaravelCollaboration\Enums\ShareOutcome;
 use Bernskiold\LaravelCollaboration\Enums\SharePermission;
 use Bernskiold\LaravelCollaboration\Events\RecordShared;
 use Bernskiold\LaravelCollaboration\Events\RecordUnshared;
@@ -126,9 +127,27 @@ it('can remove a soft-deleted person', function () {
         ->and(Activity::query()->where('event', 'unshared')->first()->properties['people'])->toBe(['Ada Lovelace']);
 });
 
-it('returns the shares with the people', function () {
-    $shares = $this->post->syncShares([$this->ada->id => SharePermission::View], $this->owner);
+it('returns the changes and the shares with the people', function () {
+    $this->post->syncShares([$this->ada->id => SharePermission::View, $this->alan->id => SharePermission::View], $this->owner);
 
-    expect($shares)->toHaveCount(1)
-        ->and($shares->first()->relationLoaded('sharedWith'))->toBeTrue();
+    $changes = $this->post->syncShares([
+        $this->ada->id => SharePermission::Edit,
+        $this->owner->id => SharePermission::View,
+    ], $this->owner);
+
+    expect($changes->added)->toBeEmpty()
+        ->and($changes->changed->all())->toBe([$this->ada->id => SharePermission::Edit])
+        ->and($changes->removed->all())->toBe([$this->alan->id => SharePermission::View])
+        ->and($changes->isEmpty())->toBeFalse()
+        ->and($changes->outcomeFor($this->ada))->toBe(ShareOutcome::Changed)
+        ->and($changes->outcomeFor($this->alan->id))->toBe(ShareOutcome::Removed)
+        ->and($changes->outcomeFor($this->owner))->toBe(ShareOutcome::Unchanged)
+        ->and($changes->shares)->toHaveCount(1)
+        ->and($changes->shares->first()->relationLoaded('sharedWith'))->toBeTrue();
+});
+
+it('returns empty changes when nothing changes', function () {
+    $this->post->syncShares([$this->ada->id => SharePermission::View], $this->owner);
+
+    expect($this->post->syncShares([$this->ada->id => SharePermission::View], $this->owner)->isEmpty())->toBeTrue();
 });

@@ -2,6 +2,7 @@ parameters:
   level: 5
   paths:
     - src
+    - database/factories
   tmpDir: build/phpstan
   ignoreErrors:
     # The trait is for the models of the application.

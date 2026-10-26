@@ -59,7 +59,7 @@ Relation::enforceMorphMap([
 
 ## Make a model shareable
 
-Implement `Shareable`. Use `CanBeShared`. Then write the `isOwnedBy()` method:
+Implement `Shareable`. Use `CanBeShared`. Then give the column that keeps the key of the owner:
 
 ```php
 use Bernskiold\LaravelCollaboration\Concerns\CanBeShared;
@@ -69,12 +69,14 @@ class Portfolio extends Model implements Shareable
 {
     use CanBeShared;
 
-    public function isOwnedBy(Model $user): bool
+    public function shareOwnerColumn(): ?string
     {
-        return $this->owner_id === $user->getKey();
+        return 'owner_id';
     }
 }
 ```
+
+`isOwnedBy()` and the `ownedBy()` scope use this column. If the owner is not in one column, override `isOwnedBy()` and the `ownedBy()` scope. Add the `#[Scope]` attribute to your `ownedBy()` method. A record without an owner column has no owner.
 
 The package does not share a record with its owner. When you delete a record, the package deletes its shares. A soft-deleted record keeps its shares until you force-delete it.
 
@@ -120,11 +122,18 @@ class PortfolioPolicy
 }
 ```
 
-If you eager load the shares, `isSharedWith()` and `permissionFor()` use the loaded shares. Then a list does not make one query for each record:
+If you eager load the shares, `isSharedWith()` and `permissionFor()` use the loaded shares. Then a list does not make one query for each record.
+
+## Find records
 
 ```php
-Portfolio::query()->with('shares')->get()->filter(fn ($portfolio) => $user->can('view', $portfolio));
+Portfolio::query()->sharedWith($user)->get();                          // shared with the user
+Portfolio::query()->sharedWith($user, SharePermission::Edit)->get();   // shared at edit
+Portfolio::query()->ownedBy($user)->get();                             // the user is the owner
+Portfolio::query()->ownedByOrSharedWith($user)->get();                 // the user is the owner, or it is shared with the user
 ```
+
+Each scope accepts a model, a key or `null`. With `null`, the scope finds no records. You can give `auth()->user()` also when nobody is signed in.
 
 The `sharedWith()` scope uses `whereHas()`. For this reason, the shares table must be on the same database server as the table of the record.
 
@@ -143,6 +152,16 @@ $record->syncShares([
 ```
 
 The person that makes the change is optional. If you do not give this person, the package uses the signed-in user.
+
+`shareWith()` and `stopSharingWith()` return a `ShareOutcome`: `Added`, `Changed`, `Removed` or `Unchanged`. Use it to tell the user what happened:
+
+```php
+if ($record->shareWith($user, SharePermission::Edit) === ShareOutcome::Unchanged) {
+    // The user already had edit access.
+}
+```
+
+`syncShares()` returns `ShareChanges`. It has the `added`, `changed` and `removed` permissions, keyed by the key of each person, and all the `shares` after the change. `outcomeFor($person)` returns the `ShareOutcome` of one person.
 
 A permission that the record does not offer causes an `InvalidArgumentException`. The package does not share a record with its owner or with an unknown user.
 
@@ -273,6 +292,16 @@ foreach ($record->sharePermissions() as $permission) {
 }
 ```
 
+## Test your application
+
+`Share::factory()` makes shares for your tests. The factory writes the share directly. It does not record activity, dispatch events or send notifications:
+
+```php
+Share::factory()->on($portfolio)->sharedWith($user)->edit()->create();
+```
+
+The states are `on($record)`, `sharedWith($user)`, `sharedBy($user)`, `view()`, `edit()` and `permission($permission)`. Without `sharedWith()`, the factory makes a user with the factory of your user model.
+
 ## Merge two users
 
 `HandOverShares` moves the shares of one user to a second user. If the two users had access to a record, the second user keeps the larger permission. If the second user is the owner of a record, the package deletes the share on that record.
@@ -282,6 +311,15 @@ app(HandOverShares::class)->execute(from: $duplicate, to: $user);
 ```
 
 Some merge tools move all the relations of a user. If you use such a tool, do not add a `shares` relation to your user model. A direct update can break the unique index of the table.
+
+## Stability
+
+These values are kept in your database or in your activity log. They do not change in a minor or a patch release:
+
+- The permission values `view` and `edit`. The package has no other permissions.
+- The columns of the shares table.
+- The events of the activity entries: `shared`, `share-changed` and `unshared`.
+- The properties of the activity entries: `people` and `people_ids`.
 
 ## Configuration
 

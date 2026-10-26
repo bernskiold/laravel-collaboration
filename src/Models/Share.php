@@ -3,9 +3,11 @@
 namespace Bernskiold\LaravelCollaboration\Models;
 
 use Bernskiold\LaravelCollaboration\Collaboration;
+use Bernskiold\LaravelCollaboration\Database\Factories\ShareFactory;
 use Bernskiold\LaravelCollaboration\Enums\SharePermission;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -28,11 +30,19 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  */
 class Share extends Model
 {
+    /** @use HasFactory<ShareFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'shared_with_id',
         'shared_by_id',
         'permission',
     ];
+
+    protected static function newFactory(): ShareFactory
+    {
+        return ShareFactory::new();
+    }
 
     public function getTable(): string
     {

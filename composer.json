@@ -47,7 +47,8 @@
     },
     "autoload": {
         "psr-4": {
-            "Bernskiold\\LaravelCollaboration\\": "src/"
+            "Bernskiold\\LaravelCollaboration\\": "src/",
+            "Bernskiold\\LaravelCollaboration\\Database\\Factories\\": "database/factories/"
         }
     },
     "autoload-dev": {

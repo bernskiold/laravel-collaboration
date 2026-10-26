@@ -2,8 +2,10 @@
 
 namespace Bernskiold\LaravelCollaboration\Contracts;
 
+use Bernskiold\LaravelCollaboration\Enums\ShareOutcome;
 use Bernskiold\LaravelCollaboration\Enums\SharePermission;
 use Bernskiold\LaravelCollaboration\Models\Share;
+use Bernskiold\LaravelCollaboration\Support\ShareChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Notifications\Notification;
@@ -12,8 +14,9 @@ use Illuminate\Support\Collection;
 /**
  * The owner of a shareable record can share it with other people.
  *
- * The CanBeShared trait implements all the methods, but not isOwnedBy().
- * Use the trait. Do not implement the other methods yourself.
+ * The CanBeShared trait implements all the methods. Use the trait. Then
+ * override shareOwnerColumn(), or override isOwnedBy() if the owner is not
+ * in one column.
  */
 interface Shareable
 {
@@ -35,23 +38,30 @@ interface Shareable
 
     /**
      * This method shares the record with one person. If the person has
-     * access, the method changes the permission.
+     * access, the method changes the permission. The method returns Added,
+     * Changed or Unchanged.
      */
-    public function shareWith(Model $user, ?SharePermission $permission = null, ?Model $sharedBy = null): void;
+    public function shareWith(Model $user, ?SharePermission $permission = null, ?Model $sharedBy = null): ShareOutcome;
 
     /**
-     * This method removes the access of one person.
+     * This method removes the access of one person. The method returns
+     * Removed or Unchanged.
      */
-    public function stopSharingWith(Model $user, ?Model $performedBy = null): void;
+    public function stopSharingWith(Model $user, ?Model $performedBy = null): ShareOutcome;
 
     /**
      * This method sets the full list of people that have access to the
      * record.
      *
      * @param  Collection<int|string, SharePermission>|array<int|string, SharePermission>  $people
-     * @return Collection<int, Share>
      */
-    public function syncShares(Collection|array $people, ?Model $performedBy = null): Collection;
+    public function syncShares(Collection|array $people, ?Model $performedBy = null): ShareChanges;
+
+    /**
+     * This method returns the column that keeps the key of the owner, or
+     * null if the record has no owner column.
+     */
+    public function shareOwnerColumn(): ?string;
 
     /**
      * This method returns true if the person is the owner of the record.

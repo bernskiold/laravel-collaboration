@@ -10,6 +10,7 @@ use Bernskiold\LaravelCollaboration\Events\RecordUnshared;
 use Bernskiold\LaravelCollaboration\Events\SharePermissionChanged;
 use Bernskiold\LaravelCollaboration\Models\Share;
 use Bernskiold\LaravelCollaboration\Support\ShareActivity;
+use Bernskiold\LaravelCollaboration\Support\ShareChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -39,9 +40,8 @@ class SyncShares
 
     /**
      * @param  Collection<int|string, SharePermission|string>  $people  The permissions. The key of each item is the key of a person.
-     * @return Collection<int, Share>
      */
-    public function execute(Model&Shareable $record, Collection $people, ?Model $performedBy = null): Collection
+    public function execute(Model&Shareable $record, Collection $people, ?Model $performedBy = null): ShareChanges
     {
         $people = $people->map(
             fn (SharePermission|string $permission): SharePermission => $permission instanceof SharePermission ? $permission : SharePermission::from($permission)
@@ -57,7 +57,7 @@ class SyncShares
         );
 
         return DB::connection($record->shares()->getRelated()->getConnectionName())
-            ->transaction(function () use ($record, $people, $users, $performedBy): Collection {
+            ->transaction(function () use ($record, $people, $users, $performedBy): ShareChanges {
                 $existing = $record->shares()->get()->keyBy('shared_with_id')->toBase();
                 $previous = $existing->map(fn (Share $share): SharePermission => $share->permission);
 
@@ -107,7 +107,12 @@ class SyncShares
                     RecordUnshared::dispatch($record, $user, $performedBy, $removed->get($user->getKey()));
                 }
 
-                return $record->shares()->with('sharedWith')->get()->toBase();
+                return new ShareChanges(
+                    added: $added,
+                    changed: $changed,
+                    removed: $removed,
+                    shares: $record->shares()->with('sharedWith')->get()->toBase(),
+                );
             });
     }
 

@@ -11,7 +11,8 @@ use Illuminate\Notifications\Notification;
 
 /**
  * A soft-deletable record. It offers only the view permission, and it
- * sends no notification.
+ * sends no notification. It has no owner column, and it overrides
+ * isOwnedBy().
  */
 class Note extends Model implements Shareable
 {

@@ -5,8 +5,10 @@ namespace Bernskiold\LaravelCollaboration\Concerns;
 use Bernskiold\LaravelCollaboration\Actions\SyncShares;
 use Bernskiold\LaravelCollaboration\Collaboration;
 use Bernskiold\LaravelCollaboration\Contracts\Shareable;
+use Bernskiold\LaravelCollaboration\Enums\ShareOutcome;
 use Bernskiold\LaravelCollaboration\Enums\SharePermission;
 use Bernskiold\LaravelCollaboration\Models\Share;
+use Bernskiold\LaravelCollaboration\Support\ShareChanges;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -16,7 +18,12 @@ use Illuminate\Notifications\Notification;
 use Illuminate\Support\Collection;
 
 /**
- * This trait implements the Shareable contract, but not isOwnedBy().
+ * This trait implements the Shareable contract.
+ *
+ * To identify the owner, override shareOwnerColumn() and return the column
+ * that keeps the key of the owner. Then isOwnedBy() and the ownedBy() scope
+ * use that column. If the owner is not in one column, override isOwnedBy()
+ * and the ownedBy() scope. Without an owner column, a record has no owner.
  *
  * When you delete the record, the trait also deletes its shares. A
  * soft-deleted record keeps its shares until you force-delete it. When you
@@ -49,8 +56,74 @@ trait CanBeShared
     }
 
     /**
+     * This method returns the column that keeps the key of the owner, or
+     * null if the record has no owner column.
+     */
+    public function shareOwnerColumn(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * This method returns true if the person is the owner of the record. It
+     * compares the owner column with the key of the person.
+     */
+    public function isOwnedBy(Model $user): bool
+    {
+        $column = $this->shareOwnerColumn();
+
+        if ($column === null || $this->getAttribute($column) === null) {
+            return false;
+        }
+
+        return (string) $this->getAttribute($column) === (string) $user->getKey();
+    }
+
+    /**
+     * This scope finds the records of which the person is the owner. Without
+     * an owner column, or without a person, the scope finds no records.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function ownedBy(Builder $query, Model|int|string|null $user): void
+    {
+        $column = $this->shareOwnerColumn();
+
+        if ($column === null || $user === null) {
+            $query->whereKey([]);
+
+            return;
+        }
+
+        $query->where($this->qualifyColumn($column), $user instanceof Model ? $user->getKey() : $user);
+    }
+
+    /**
+     * This scope finds the records of which the person is the owner, and the
+     * records that are shared with the person at the permission or at a
+     * larger permission. It uses the ownedBy() and the sharedWith() scopes.
+     * If a model overrides ownedBy(), this scope uses the override.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function ownedByOrSharedWith(Builder $query, Model|int|string|null $user, SharePermission $atLeast = SharePermission::View): void
+    {
+        $query->where(function (Builder $query) use ($user, $atLeast): void {
+            /** @var Builder<static> $query */
+            $query->ownedBy($user)->orWhere(function (Builder $query) use ($user, $atLeast): void {
+                /** @var Builder<static> $query */
+                $query->sharedWith($user, $atLeast);
+            });
+        });
+    }
+
+    /**
      * This scope finds the records that are shared with the person, at the
-     * permission or at a larger permission.
+     * permission or at a larger permission. Without a person, the scope
+     * finds no records. You can give the signed-in user also when nobody is
+     * signed in.
      *
      * The query uses whereHas(). For this reason, the shares table must be
      * on the same database server as the table of the record.
@@ -58,8 +131,14 @@ trait CanBeShared
      * @param  Builder<static>  $query
      */
     #[Scope]
-    protected function sharedWith(Builder $query, Model|int|string $user, SharePermission $atLeast = SharePermission::View): void
+    protected function sharedWith(Builder $query, Model|int|string|null $user, SharePermission $atLeast = SharePermission::View): void
     {
+        if ($user === null) {
+            $query->whereKey([]);
+
+            return;
+        }
+
         $query->whereHas('shares', function (Builder $shares) use ($user, $atLeast): void {
             /** @var Builder<Share> $shares */
             $shares->forPerson($user)->allowing($atLeast);
@@ -92,26 +171,26 @@ trait CanBeShared
     /**
      * This method shares the record with one person. If the person has
      * access, the method changes the permission. The other shares do not
-     * change.
+     * change. The method returns Added, Changed or Unchanged.
      */
-    public function shareWith(Model $user, ?SharePermission $permission = null, ?Model $sharedBy = null): void
+    public function shareWith(Model $user, ?SharePermission $permission = null, ?Model $sharedBy = null): ShareOutcome
     {
-        $this->syncShares(
+        return $this->syncShares(
             $this->currentShares()->put($user->getKey(), $permission ?? $this->sharePermissions()[0]),
             $sharedBy ?? Collaboration::actingUser(),
-        );
+        )->outcomeFor($user);
     }
 
     /**
      * This method removes the access of one person. The other shares do not
-     * change.
+     * change. The method returns Removed or Unchanged.
      */
-    public function stopSharingWith(Model $user, ?Model $performedBy = null): void
+    public function stopSharingWith(Model $user, ?Model $performedBy = null): ShareOutcome
     {
-        $this->syncShares(
+        return $this->syncShares(
             $this->currentShares()->forget($user->getKey()),
             $performedBy ?? Collaboration::actingUser(),
-        );
+        )->outcomeFor($user);
     }
 
     /**
@@ -119,9 +198,8 @@ trait CanBeShared
      * record.
      *
      * @param  Collection<int|string, SharePermission>|array<int|string, SharePermission>  $people  The permissions. The key of each item is the key of a person.
-     * @return Collection<int, Share>
      */
-    public function syncShares(Collection|array $people, ?Model $performedBy = null): Collection
+    public function syncShares(Collection|array $people, ?Model $performedBy = null): ShareChanges
     {
         /** @var Model&Shareable $this */
         return app(SyncShares::class)->execute($this, collect($people), $performedBy);
