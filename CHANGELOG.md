@@ -2,7 +2,7 @@
 
 This file records all the important changes to `laravel-collaboration`.
 
-## Unreleased
+## v1.0.0 - 2026-10-27
 
 - First release.
 - The package has no user interface. It has no views and no components.
