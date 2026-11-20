@@ -2,6 +2,22 @@
 
 This file records all the important changes to `laravel-collaboration`.
 
+## v1.0.1 - 2026-11-20
+
+### What's Changed
+
+* Bump dependabot/fetch-metadata from 2.5.0 to 3.1.0 by @dependabot[bot] in https://github.com/bernskiold/laravel-collaboration/pull/2
+* Bump actions/checkout from 6 to 7 by @dependabot[bot] in https://github.com/bernskiold/laravel-collaboration/pull/1
+* Add PHP 8.6 to the test matrix by @ErikBernskiold in https://github.com/bernskiold/laravel-collaboration/pull/3
+* Require PHP 8.6 in the test matrix by @ErikBernskiold in https://github.com/bernskiold/laravel-collaboration/pull/4
+
+### New Contributors
+
+* @dependabot[bot] made their first contribution in https://github.com/bernskiold/laravel-collaboration/pull/2
+* @ErikBernskiold made their first contribution in https://github.com/bernskiold/laravel-collaboration/pull/3
+
+**Full Changelog**: https://github.com/bernskiold/laravel-collaboration/compare/v1.0.0...v1.0.1
+
 ## v1.0.0 - 2026-10-27
 
 - First release.
